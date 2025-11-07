@@ -48,3 +48,11 @@
 - [x] Adicionar botão de exclusão na tabela de registros
 - [x] Adicionar funcionalidade de restaurar registros excluídos
 - [x] Testar soft delete e exclusão permanente
+
+
+## Funcionalidade de Envio de Email
+- [ ] Implementar rota tRPC para envio de email
+- [ ] Adicionar botão de envio de email na tabela de registros
+- [ ] Configurar email pré-preenchido (emanuel@ipexconstrutora.com.br)
+- [ ] Testar envio de email
+- [ ] Criar checkpoint final com email

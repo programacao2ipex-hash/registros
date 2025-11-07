@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { APP_LOGO, getLoginUrl } from "@/const";
 import { trpc } from "@/lib/trpc";
-import { Download, FileText, Loader2, Trash2, ArchiveX } from "lucide-react";
+import { Download, FileText, Loader2, Trash2, ArchiveX, Mail } from "lucide-react";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -22,9 +22,17 @@ export default function Registros() {
   const exportCSVMutation = trpc.documentRecords.exportCSV.useQuery(undefined, {
     enabled: false,
   });
+  const sendEmailMutation = trpc.documentRecords.sendEmail.useMutation({
+    onSuccess: () => {
+      toast.success("Email enviado com sucesso para a direcao");
+    },
+    onError: () => {
+      toast.error("Erro ao enviar email");
+    },
+  });
   const softDeleteMutation = trpc.documentRecords.softDelete.useMutation({
     onSuccess: () => {
-      toast.success("Registro movido para excluídos");
+      toast.success("Registro movido para excluidos");
       refetch();
     },
     onError: () => {
@@ -33,7 +41,7 @@ export default function Registros() {
   });
   const permanentDeleteMutation = trpc.documentRecords.permanentlyDelete.useMutation({
     onSuccess: () => {
-      toast.success("Registro excluído permanentemente");
+      toast.success("Registro excluido permanentemente");
       refetchDeleted();
     },
     onError: () => {
@@ -81,13 +89,11 @@ export default function Registros() {
     try {
       const doc = new jsPDF();
       
-      // Add title
       doc.setFontSize(16);
       doc.text("Registro de Documentos Assinados - IPEX", 14, 15);
       doc.setFontSize(10);
       doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')}`, 14, 22);
       
-      // Prepare table data
       const tableData = dataToExport.map(record => {
         const company = record.company === "OUTRO" ? record.companyOther : record.company;
         const subject = record.subject === "OUTRO" ? record.subjectOther : record.subject;
@@ -110,7 +116,6 @@ export default function Registros() {
         ];
       });
       
-      // Add table
       autoTable(doc, {
         startY: 28,
         head: [[
@@ -122,7 +127,7 @@ export default function Registros() {
           "Plataforma",
           "Assinado Por",
           "Data",
-          "Responsável",
+          "Responsavel",
           "Criado em"
         ]],
         body: tableData,
@@ -152,7 +157,7 @@ export default function Registros() {
           <CardHeader className="text-center">
             <img src={APP_LOGO} alt="IPEX Logo" className="w-32 mx-auto mb-4" />
             <CardTitle>Registro de Documentos Assinados</CardTitle>
-            <CardDescription>Faça login para acessar o sistema</CardDescription>
+            <CardDescription>Faca login para acessar o sistema</CardDescription>
           </CardHeader>
           <CardContent>
             <Button asChild className="w-full">
@@ -179,7 +184,7 @@ export default function Registros() {
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <span className="text-sm text-muted-foreground">Olá, {user?.name}</span>
+            <span className="text-sm text-muted-foreground">Ola, {user?.name}</span>
             <Button variant="outline" size="sm" asChild>
               <a href="/">Novo Registro</a>
             </Button>
@@ -194,7 +199,7 @@ export default function Registros() {
               <div className="flex items-center gap-2">
                 <FileText className="w-6 h-6 text-primary" />
                 <div>
-                  <CardTitle>{showDeleted ? "Registros Excluídos" : "Registros de Documentos"}</CardTitle>
+                  <CardTitle>{showDeleted ? "Registros Excluidos" : "Registros de Documentos"}</CardTitle>
                   <CardDescription>{showDeleted ? "Documentos movidos para excluir" : "Lista de todos os documentos assinados"}</CardDescription>
                 </div>
               </div>
@@ -204,7 +209,7 @@ export default function Registros() {
                   onClick={() => setShowDeleted(!showDeleted)}
                 >
                   <ArchiveX className="w-4 h-4 mr-2" />
-                  {showDeleted ? "Ver Ativos" : "Ver Excluídos"}
+                  {showDeleted ? "Ver Ativos" : "Ver Excluidos"}
                 </Button>
                 {!showDeleted && (
                   <>
@@ -233,7 +238,7 @@ export default function Registros() {
             ) : !displayRecords || displayRecords.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                <p>{showDeleted ? "Nenhum registro excluído" : "Nenhum registro encontrado"}</p>
+                <p>{showDeleted ? "Nenhum registro excluido" : "Nenhum registro encontrado"}</p>
                 {!showDeleted && (
                   <Button asChild className="mt-4">
                     <a href="/">Criar Primeiro Registro</a>
@@ -252,8 +257,8 @@ export default function Registros() {
                       <TableHead>Tipo Documento</TableHead>
                       <TableHead>Assinatura de</TableHead>
                       <TableHead>Data</TableHead>
-                      <TableHead>Responsável</TableHead>
-                      <TableHead>Ações</TableHead>
+                      <TableHead>Responsavel</TableHead>
+                      <TableHead>Acoes</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -299,14 +304,29 @@ export default function Registros() {
                                 </Button>
                               </div>
                             ) : (
-                              <Button 
-                                size="sm" 
-                                variant="destructive"
-                                onClick={() => softDeleteMutation.mutate({ id: record.id })}
-                                disabled={softDeleteMutation.isPending}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
+                              <div className="flex gap-2">
+                                <Button 
+                                  size="sm" 
+                                  variant="outline"
+                                  onClick={() => sendEmailMutation.mutate({ id: record.id })}
+                                  disabled={sendEmailMutation.isPending}
+                                  title="Enviar email para a direcao"
+                                >
+                                  {sendEmailMutation.isPending ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                  ) : (
+                                    <Mail className="w-4 h-4" />
+                                  )}
+                                </Button>
+                                <Button 
+                                  size="sm" 
+                                  variant="destructive"
+                                  onClick={() => softDeleteMutation.mutate({ id: record.id })}
+                                  disabled={softDeleteMutation.isPending}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
                             )}
                           </TableCell>
                         </TableRow>

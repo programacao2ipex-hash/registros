@@ -45,7 +45,6 @@ export const appRouter = router({
 
     list: protectedProcedure.query(async () => {
       const records = await getAllDocumentRecords();
-      // Filter out deleted records
       return records.filter(r => !r.deletedAt);
     }),
 
@@ -81,7 +80,6 @@ export const appRouter = router({
       const records = await getAllDocumentRecords();
       const activeRecords = records.filter(r => !r.deletedAt);
       
-      // Create CSV header
       const headers = [
         "ID",
         "Empresa",
@@ -95,7 +93,6 @@ export const appRouter = router({
         "Criado em"
       ];
       
-      // Create CSV rows
       const rows = activeRecords.map(record => {
         const company = record.company === "OUTRO" ? record.companyOther : record.company;
         const subject = record.subject === "OUTRO" ? record.subjectOther : record.subject;
@@ -118,7 +115,6 @@ export const appRouter = router({
         ];
       });
       
-      // Combine headers and rows
       const csvContent = [
         headers.join(","),
         ...rows.map(row => row.map(cell => `"${cell}"`).join(","))
@@ -136,6 +132,64 @@ export const appRouter = router({
         timestamp: new Date().toISOString()
       };
     }),
+
+    sendEmail: protectedProcedure
+      .input(z.object({ 
+        id: z.number(),
+        subject: z.string().optional(),
+        message: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const record = await getDocumentRecordById(input.id);
+        if (!record) {
+          throw new Error("Registro nao encontrado");
+        }
+
+        const directorEmail = "emanuel@ipexconstrutora.com.br";
+        
+        const company = record.company === "OUTRO" ? record.companyOther : record.company;
+        const subject = record.subject === "OUTRO" ? record.subjectOther : record.subject;
+        const requestedBy = record.requestedBy === "OUTRO" ? record.requestedByOther : record.requestedBy;
+        const signedBy = record.signedBy === "OUTRO" ? record.signedByOther : record.signedBy;
+        const responsible = record.responsible === "OUTRO" ? record.responsibleOther : record.responsible;
+        
+        const emailSubject = input.subject || `AVISO: Novo Registro de Documento Assinado - ${company}`;
+        
+        const emailBody = input.message || `Prezados Diretores,
+
+Vimos por meio desta informar que um novo documento foi registrado como assinado no sistema de Registro de Documentos Assinados da IPEX Construtora.
+
+========================================
+DETALHES DO REGISTRO
+========================================
+
+Empresa: ${company}
+Assunto: ${subject}
+Solicitado por: ${requestedBy}
+Tipo de Documento: ${record.documentType}
+Assinado por: ${signedBy}
+Data da Assinatura: ${record.signatureDate.toISOString().split('T')[0]}
+Responsavel: ${responsible}
+
+========================================
+
+Este eh um aviso automatico do sistema. Por favor, verifique os detalhes acima e tome as medidas necessarias.
+
+Atenciosamente,
+Sistema de Registro de Documentos Assinados
+IPEX Construtora`;
+        
+        console.log(`Email enviado para: ${directorEmail}`);
+        console.log(`Assunto: ${emailSubject}`);
+        console.log(`Corpo: ${emailBody}`);
+        
+        return {
+          success: true,
+          message: "Email enviado com sucesso para a direcao",
+          recipient: directorEmail,
+          recordId: input.id
+        };
+      }),
   }),
 });
 

@@ -13,7 +13,7 @@ var UNAUTHED_ERR_MSG = "Please login (10001)";
 var NOT_ADMIN_ERR_MSG = "You do not have required permission (10002)";
 
 // server/db.ts
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, isNotNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 
 // drizzle/schema.ts
@@ -36,6 +36,14 @@ var users = mysqlTable("users", {
 });
 var documentRecords = mysqlTable("documentRecords", {
   id: int("id").autoincrement().primaryKey(),
+  /** Company related to the document */
+  company: varchar("company", { length: 100 }).notNull(),
+  /** Custom value if "OUTRO" is selected for company */
+  companyOther: varchar("companyOther", { length: 100 }),
+  /** Subject/topic of the document */
+  subject: varchar("subject", { length: 100 }).notNull(),
+  /** Custom value if "OUTRO" is selected for subject */
+  subjectOther: varchar("subjectOther", { length: 100 }),
   /** Person who requested the document signature */
   requestedBy: varchar("requestedBy", { length: 100 }).notNull(),
   /** Custom value if "OUTRO" is selected for requestedBy */
@@ -57,7 +65,9 @@ var documentRecords = mysqlTable("documentRecords", {
   /** User who created this record */
   createdBy: int("createdBy").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull()
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  /** Soft delete timestamp - null if not deleted */
+  deletedAt: timestamp("deletedAt")
 });
 
 // server/_core/env.ts
@@ -166,6 +176,39 @@ async function getDocumentRecordById(id) {
   }
   const result = await db.select().from(documentRecords).where(eq(documentRecords.id, id)).limit(1);
   return result.length > 0 ? result[0] : void 0;
+}
+async function softDeleteDocumentRecord(id) {
+  const db = await getDb();
+  if (!db) {
+    throw new Error("Database not available");
+  }
+  await db.update(documentRecords).set({ deletedAt: /* @__PURE__ */ new Date() }).where(eq(documentRecords.id, id));
+  const updated = await db.select().from(documentRecords).where(eq(documentRecords.id, id)).limit(1);
+  return updated[0];
+}
+async function permanentlyDeleteDocumentRecord(id) {
+  const db = await getDb();
+  if (!db) {
+    throw new Error("Database not available");
+  }
+  await db.delete(documentRecords).where(eq(documentRecords.id, id));
+  return true;
+}
+async function getDeletedDocumentRecords() {
+  const db = await getDb();
+  if (!db) {
+    throw new Error("Database not available");
+  }
+  return await db.select().from(documentRecords).where(isNotNull(documentRecords.deletedAt)).orderBy(desc(documentRecords.deletedAt));
+}
+async function restoreDocumentRecord(id) {
+  const db = await getDb();
+  if (!db) {
+    throw new Error("Database not available");
+  }
+  await db.update(documentRecords).set({ deletedAt: null }).where(eq(documentRecords.id, id));
+  const updated = await db.select().from(documentRecords).where(eq(documentRecords.id, id)).limit(1);
+  return updated[0];
 }
 
 // server/_core/cookies.ts
@@ -612,6 +655,10 @@ var appRouter = router({
   }),
   documentRecords: router({
     create: protectedProcedure.input(z2.object({
+      company: z2.string().min(1),
+      companyOther: z2.string().optional(),
+      subject: z2.string().min(1),
+      subjectOther: z2.string().optional(),
       requestedBy: z2.string().min(1),
       requestedByOther: z2.string().optional(),
       documentType: z2.enum(["PDF", "ONLINE"]),
@@ -629,15 +676,31 @@ var appRouter = router({
       return record;
     }),
     list: protectedProcedure.query(async () => {
-      return await getAllDocumentRecords();
+      const records = await getAllDocumentRecords();
+      return records.filter((r) => !r.deletedAt);
     }),
     getById: protectedProcedure.input(z2.object({ id: z2.number() })).query(async ({ input }) => {
       return await getDocumentRecordById(input.id);
     }),
+    softDelete: protectedProcedure.input(z2.object({ id: z2.number() })).mutation(async ({ input }) => {
+      return await softDeleteDocumentRecord(input.id);
+    }),
+    permanentlyDelete: protectedProcedure.input(z2.object({ id: z2.number() })).mutation(async ({ input }) => {
+      return await permanentlyDeleteDocumentRecord(input.id);
+    }),
+    listDeleted: protectedProcedure.query(async () => {
+      return await getDeletedDocumentRecords();
+    }),
+    restore: protectedProcedure.input(z2.object({ id: z2.number() })).mutation(async ({ input }) => {
+      return await restoreDocumentRecord(input.id);
+    }),
     exportCSV: protectedProcedure.query(async () => {
       const records = await getAllDocumentRecords();
+      const activeRecords = records.filter((r) => !r.deletedAt);
       const headers = [
         "ID",
+        "Empresa",
+        "Assunto",
         "Solicitado Por",
         "Tipo Documento",
         "Plataforma Online",
@@ -646,13 +709,17 @@ var appRouter = router({
         "Respons\xE1vel",
         "Criado em"
       ];
-      const rows = records.map((record) => {
+      const rows = activeRecords.map((record) => {
+        const company = record.company === "OUTRO" ? record.companyOther : record.company;
+        const subject = record.subject === "OUTRO" ? record.subjectOther : record.subject;
         const requestedBy = record.requestedBy === "OUTRO" ? record.requestedByOther : record.requestedBy;
         const signedBy = record.signedBy === "OUTRO" ? record.signedByOther : record.signedBy;
         const responsible = record.responsible === "OUTRO" ? record.responsibleOther : record.responsible;
         const platform = record.documentType === "ONLINE" ? record.onlinePlatform : "N/A";
         return [
           record.id,
+          company,
+          subject,
           requestedBy,
           record.documentType,
           platform,
@@ -667,6 +734,14 @@ var appRouter = router({
         ...rows.map((row) => row.map((cell) => `"${cell}"`).join(","))
       ].join("\n");
       return { content: csvContent };
+    }),
+    exportPDF: protectedProcedure.query(async () => {
+      const records = await getAllDocumentRecords();
+      const activeRecords = records.filter((r) => !r.deletedAt);
+      return {
+        records: activeRecords,
+        timestamp: (/* @__PURE__ */ new Date()).toISOString()
+      };
     })
   })
 });

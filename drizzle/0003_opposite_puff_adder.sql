@@ -1,0 +1,1 @@
+ALTER TABLE `documentRecords` ADD `deletedAt` timestamp;

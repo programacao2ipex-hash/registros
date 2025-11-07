@@ -10,6 +10,8 @@ import { FileText, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
+const COMPANY_OPTIONS = ["IPEX CONSTRUTORA", "NEW YORK LOFTS", "MANHATTAN LOFTS", "CARPE DIEM RESIDENCIAL", "GREEN TOWER", "IPEX AGRONEGOCIOS", "OUTRO"];
+const SUBJECT_OPTIONS = ["CONTRATO VENDA", "CONTRATO FORNECEDOR", "RECEBÍVEL", "OUTRO"];
 const REQUESTED_BY_OPTIONS = ["RAMON", "JESSICA", "LADY", "EMANUEL", "LED MARLON", "LEANDRO", "MATHEUS", "EDUARDO", "OUTRO"];
 const SIGNED_BY_OPTIONS = ["EMANUEL", "PAULO", "LEONILDA", "OUTRO"];
 const RESPONSIBLE_OPTIONS = ["RICARDO", "OUTRO"];
@@ -18,6 +20,10 @@ const DOCUMENT_TYPES = ["PDF", "ONLINE"];
 export default function Home() {
   const { user, loading, isAuthenticated } = useAuth();
   const [formData, setFormData] = useState({
+    company: "",
+    companyOther: "",
+    subject: "",
+    subjectOther: "",
     requestedBy: "",
     requestedByOther: "",
     documentType: "",
@@ -34,6 +40,10 @@ export default function Home() {
       toast.success("Registro criado com sucesso!");
       // Reset form
       setFormData({
+        company: "",
+        companyOther: "",
+        subject: "",
+        subjectOther: "",
         requestedBy: "",
         requestedByOther: "",
         documentType: "",
@@ -54,6 +64,22 @@ export default function Home() {
     e.preventDefault();
     
     // Validation
+    if (!formData.company) {
+      toast.error("Selecione a empresa");
+      return;
+    }
+    if (formData.company === "OUTRO" && !formData.companyOther) {
+      toast.error("Digite o nome da empresa");
+      return;
+    }
+    if (!formData.subject) {
+      toast.error("Selecione o assunto");
+      return;
+    }
+    if (formData.subject === "OUTRO" && !formData.subjectOther) {
+      toast.error("Digite o assunto");
+      return;
+    }
     if (!formData.requestedBy) {
       toast.error("Selecione quem solicitou");
       return;
@@ -92,6 +118,10 @@ export default function Home() {
     }
 
     createMutation.mutate({
+      company: formData.company,
+      companyOther: formData.company === "OUTRO" ? formData.companyOther : undefined,
+      subject: formData.subject,
+      subjectOther: formData.subject === "OUTRO" ? formData.subjectOther : undefined,
       requestedBy: formData.requestedBy,
       requestedByOther: formData.requestedBy === "OUTRO" ? formData.requestedByOther : undefined,
       documentType: formData.documentType as "PDF" | "ONLINE",
@@ -162,6 +192,48 @@ export default function Home() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="company">Empresa</Label>
+                <Select value={formData.company} onValueChange={(value) => setFormData({ ...formData, company: value })}>
+                  <SelectTrigger id="company">
+                    <SelectValue placeholder="Selecione..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {COMPANY_OPTIONS.map(option => (
+                      <SelectItem key={option} value={option}>{option}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {formData.company === "OUTRO" && (
+                  <Input
+                    placeholder="Digite o nome da empresa"
+                    value={formData.companyOther}
+                    onChange={(e) => setFormData({ ...formData, companyOther: e.target.value })}
+                  />
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="subject">Assunto</Label>
+                <Select value={formData.subject} onValueChange={(value) => setFormData({ ...formData, subject: value })}>
+                  <SelectTrigger id="subject">
+                    <SelectValue placeholder="Selecione..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SUBJECT_OPTIONS.map(option => (
+                      <SelectItem key={option} value={option}>{option}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {formData.subject === "OUTRO" && (
+                  <Input
+                    placeholder="Digite o assunto"
+                    value={formData.subjectOther}
+                    onChange={(e) => setFormData({ ...formData, subjectOther: e.target.value })}
+                  />
+                )}
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="requestedBy">Solicitado por</Label>
                 <Select value={formData.requestedBy} onValueChange={(value) => setFormData({ ...formData, requestedBy: value })}>

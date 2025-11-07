@@ -30,6 +30,14 @@ export type InsertUser = typeof users.$inferInsert;
  */
 export const documentRecords = mysqlTable("documentRecords", {
   id: int("id").autoincrement().primaryKey(),
+  /** Company related to the document */
+  company: varchar("company", { length: 100 }).notNull(),
+  /** Custom value if "OUTRO" is selected for company */
+  companyOther: varchar("companyOther", { length: 100 }),
+  /** Subject/topic of the document */
+  subject: varchar("subject", { length: 100 }).notNull(),
+  /** Custom value if "OUTRO" is selected for subject */
+  subjectOther: varchar("subjectOther", { length: 100 }),
   /** Person who requested the document signature */
   requestedBy: varchar("requestedBy", { length: 100 }).notNull(),
   /** Custom value if "OUTRO" is selected for requestedBy */
@@ -52,6 +60,8 @@ export const documentRecords = mysqlTable("documentRecords", {
   createdBy: int("createdBy").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  /** Soft delete timestamp - null if not deleted */
+  deletedAt: timestamp("deletedAt"),
 });
 
 export type DocumentRecord = typeof documentRecords.$inferSelect;

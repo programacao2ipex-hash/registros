@@ -2,7 +2,7 @@ import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
-import { createDocumentRecord, getAllDocumentRecords, getDocumentRecordById } from "./db";
+import { createDocumentRecord, getAllDocumentRecords, getDocumentRecordById, softDeleteDocumentRecord, permanentlyDeleteDocumentRecord, getDeletedDocumentRecords, restoreDocumentRecord } from "./db";
 import { z } from "zod";
 
 export const appRouter = router({
@@ -21,6 +21,10 @@ export const appRouter = router({
   documentRecords: router({
     create: protectedProcedure
       .input(z.object({
+        company: z.string().min(1),
+        companyOther: z.string().optional(),
+        subject: z.string().min(1),
+        subjectOther: z.string().optional(),
         requestedBy: z.string().min(1),
         requestedByOther: z.string().optional(),
         documentType: z.enum(["PDF", "ONLINE"]),
@@ -40,7 +44,9 @@ export const appRouter = router({
       }),
 
     list: protectedProcedure.query(async () => {
-      return await getAllDocumentRecords();
+      const records = await getAllDocumentRecords();
+      // Filter out deleted records
+      return records.filter(r => !r.deletedAt);
     }),
 
     getById: protectedProcedure
@@ -49,12 +55,37 @@ export const appRouter = router({
         return await getDocumentRecordById(input.id);
       }),
 
+    softDelete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        return await softDeleteDocumentRecord(input.id);
+      }),
+
+    permanentlyDelete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        return await permanentlyDeleteDocumentRecord(input.id);
+      }),
+
+    listDeleted: protectedProcedure.query(async () => {
+      return await getDeletedDocumentRecords();
+    }),
+
+    restore: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        return await restoreDocumentRecord(input.id);
+      }),
+
     exportCSV: protectedProcedure.query(async () => {
       const records = await getAllDocumentRecords();
+      const activeRecords = records.filter(r => !r.deletedAt);
       
       // Create CSV header
       const headers = [
         "ID",
+        "Empresa",
+        "Assunto",
         "Solicitado Por",
         "Tipo Documento",
         "Plataforma Online",
@@ -65,7 +96,9 @@ export const appRouter = router({
       ];
       
       // Create CSV rows
-      const rows = records.map(record => {
+      const rows = activeRecords.map(record => {
+        const company = record.company === "OUTRO" ? record.companyOther : record.company;
+        const subject = record.subject === "OUTRO" ? record.subjectOther : record.subject;
         const requestedBy = record.requestedBy === "OUTRO" ? record.requestedByOther : record.requestedBy;
         const signedBy = record.signedBy === "OUTRO" ? record.signedByOther : record.signedBy;
         const responsible = record.responsible === "OUTRO" ? record.responsibleOther : record.responsible;
@@ -73,6 +106,8 @@ export const appRouter = router({
         
         return [
           record.id,
+          company,
+          subject,
           requestedBy,
           record.documentType,
           platform,
@@ -90,6 +125,16 @@ export const appRouter = router({
       ].join("\n");
       
       return { content: csvContent };
+    }),
+
+    exportPDF: protectedProcedure.query(async () => {
+      const records = await getAllDocumentRecords();
+      const activeRecords = records.filter(r => !r.deletedAt);
+      
+      return {
+        records: activeRecords,
+        timestamp: new Date().toISOString()
+      };
     }),
   }),
 });

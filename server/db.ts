@@ -1,4 +1,4 @@
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, isNull, isNotNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { InsertUser, users, documentRecords, InsertDocumentRecord, DocumentRecord } from "../drizzle/schema";
 import { ENV } from './_core/env';
@@ -120,4 +120,47 @@ export async function getDocumentRecordById(id: number): Promise<DocumentRecord 
 
   const result = await db.select().from(documentRecords).where(eq(documentRecords.id, id)).limit(1);
   return result.length > 0 ? result[0] : undefined;
+}
+
+export async function softDeleteDocumentRecord(id: number): Promise<DocumentRecord> {
+  const db = await getDb();
+  if (!db) {
+    throw new Error("Database not available");
+  }
+
+  await db.update(documentRecords).set({ deletedAt: new Date() }).where(eq(documentRecords.id, id));
+  
+  const updated = await db.select().from(documentRecords).where(eq(documentRecords.id, id)).limit(1);
+  return updated[0];
+}
+
+export async function permanentlyDeleteDocumentRecord(id: number): Promise<boolean> {
+  const db = await getDb();
+  if (!db) {
+    throw new Error("Database not available");
+  }
+
+  await db.delete(documentRecords).where(eq(documentRecords.id, id));
+  return true;
+}
+
+export async function getDeletedDocumentRecords(): Promise<DocumentRecord[]> {
+  const db = await getDb();
+  if (!db) {
+    throw new Error("Database not available");
+  }
+
+  return await db.select().from(documentRecords).where(isNotNull(documentRecords.deletedAt)).orderBy(desc(documentRecords.deletedAt));
+}
+
+export async function restoreDocumentRecord(id: number): Promise<DocumentRecord> {
+  const db = await getDb();
+  if (!db) {
+    throw new Error("Database not available");
+  }
+
+  await db.update(documentRecords).set({ deletedAt: null }).where(eq(documentRecords.id, id));
+  
+  const updated = await db.select().from(documentRecords).where(eq(documentRecords.id, id)).limit(1);
+  return updated[0];
 }

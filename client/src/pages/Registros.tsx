@@ -4,18 +4,51 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { APP_LOGO, getLoginUrl } from "@/const";
 import { trpc } from "@/lib/trpc";
-import { Download, FileText, Loader2 } from "lucide-react";
+import { Download, FileText, Loader2, Trash2, ArchiveX } from "lucide-react";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { useState } from "react";
 
 export default function Registros() {
   const { user, loading, isAuthenticated } = useAuth();
-  const { data: records, isLoading: recordsLoading } = trpc.documentRecords.list.useQuery(undefined, {
-    enabled: isAuthenticated,
+  const [showDeleted, setShowDeleted] = useState(false);
+  const { data: records, isLoading: recordsLoading, refetch } = trpc.documentRecords.list.useQuery(undefined, {
+    enabled: isAuthenticated && !showDeleted,
+  });
+  const { data: deletedRecords, isLoading: deletedLoading, refetch: refetchDeleted } = trpc.documentRecords.listDeleted.useQuery(undefined, {
+    enabled: isAuthenticated && showDeleted,
   });
   const exportCSVMutation = trpc.documentRecords.exportCSV.useQuery(undefined, {
     enabled: false,
+  });
+  const softDeleteMutation = trpc.documentRecords.softDelete.useMutation({
+    onSuccess: () => {
+      toast.success("Registro movido para excluídos");
+      refetch();
+    },
+    onError: () => {
+      toast.error("Erro ao excluir registro");
+    },
+  });
+  const permanentDeleteMutation = trpc.documentRecords.permanentlyDelete.useMutation({
+    onSuccess: () => {
+      toast.success("Registro excluído permanentemente");
+      refetchDeleted();
+    },
+    onError: () => {
+      toast.error("Erro ao excluir permanentemente");
+    },
+  });
+  const restoreMutation = trpc.documentRecords.restore.useMutation({
+    onSuccess: () => {
+      toast.success("Registro restaurado");
+      refetchDeleted();
+      refetch();
+    },
+    onError: () => {
+      toast.error("Erro ao restaurar registro");
+    },
   });
 
   const handleExportCSV = async () => {
@@ -39,7 +72,8 @@ export default function Registros() {
   };
 
   const handleExportPDF = () => {
-    if (!records || records.length === 0) {
+    const dataToExport = showDeleted ? deletedRecords : records;
+    if (!dataToExport || dataToExport.length === 0) {
       toast.error("Nenhum registro para exportar");
       return;
     }
@@ -54,7 +88,9 @@ export default function Registros() {
       doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')}`, 14, 22);
       
       // Prepare table data
-      const tableData = records.map(record => {
+      const tableData = dataToExport.map(record => {
+        const company = record.company === "OUTRO" ? record.companyOther : record.company;
+        const subject = record.subject === "OUTRO" ? record.subjectOther : record.subject;
         const requestedBy = record.requestedBy === "OUTRO" ? record.requestedByOther : record.requestedBy;
         const signedBy = record.signedBy === "OUTRO" ? record.signedByOther : record.signedBy;
         const responsible = record.responsible === "OUTRO" ? record.responsibleOther : record.responsible;
@@ -62,6 +98,8 @@ export default function Registros() {
         
         return [
           record.id,
+          company,
+          subject,
           requestedBy,
           record.documentType,
           platform,
@@ -77,12 +115,14 @@ export default function Registros() {
         startY: 28,
         head: [[
           "ID",
+          "Empresa",
+          "Assunto",
           "Solicitado Por",
           "Tipo",
           "Plataforma",
           "Assinado Por",
           "Data",
-          "Respons\u00e1vel",
+          "Responsável",
           "Criado em"
         ]],
         body: tableData,
@@ -124,6 +164,9 @@ export default function Registros() {
     );
   }
 
+  const displayRecords = showDeleted ? deletedRecords : records;
+  const isDisplayLoading = showDeleted ? deletedLoading : recordsLoading;
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b bg-card">
@@ -151,38 +194,51 @@ export default function Registros() {
               <div className="flex items-center gap-2">
                 <FileText className="w-6 h-6 text-primary" />
                 <div>
-                  <CardTitle>Registros de Documentos</CardTitle>
-                  <CardDescription>Lista de todos os documentos assinados</CardDescription>
+                  <CardTitle>{showDeleted ? "Registros Excluídos" : "Registros de Documentos"}</CardTitle>
+                  <CardDescription>{showDeleted ? "Documentos movidos para excluir" : "Lista de todos os documentos assinados"}</CardDescription>
                 </div>
               </div>
               <div className="flex gap-2">
-                <Button variant="outline" onClick={handleExportCSV} disabled={exportCSVMutation.isFetching}>
-                  {exportCSVMutation.isFetching ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <Download className="w-4 h-4 mr-2" />
-                  )}
-                  Exportar CSV
+                <Button 
+                  variant={showDeleted ? "default" : "outline"} 
+                  onClick={() => setShowDeleted(!showDeleted)}
+                >
+                  <ArchiveX className="w-4 h-4 mr-2" />
+                  {showDeleted ? "Ver Ativos" : "Ver Excluídos"}
                 </Button>
-                <Button variant="outline" onClick={handleExportPDF}>
-                  <Download className="w-4 h-4 mr-2" />
-                  Exportar PDF
-                </Button>
+                {!showDeleted && (
+                  <>
+                    <Button variant="outline" onClick={handleExportCSV} disabled={exportCSVMutation.isFetching}>
+                      {exportCSVMutation.isFetching ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Download className="w-4 h-4 mr-2" />
+                      )}
+                      Exportar CSV
+                    </Button>
+                    <Button variant="outline" onClick={handleExportPDF}>
+                      <Download className="w-4 h-4 mr-2" />
+                      Exportar PDF
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
           </CardHeader>
           <CardContent>
-            {recordsLoading ? (
+            {isDisplayLoading ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="w-8 h-8 animate-spin text-primary" />
               </div>
-            ) : !records || records.length === 0 ? (
+            ) : !displayRecords || displayRecords.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                <p>Nenhum registro encontrado</p>
-                <Button asChild className="mt-4">
-                  <a href="/">Criar Primeiro Registro</a>
-                </Button>
+                <p>{showDeleted ? "Nenhum registro excluído" : "Nenhum registro encontrado"}</p>
+                {!showDeleted && (
+                  <Button asChild className="mt-4">
+                    <a href="/">Criar Primeiro Registro</a>
+                  </Button>
+                )}
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -190,32 +246,69 @@ export default function Registros() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>ID</TableHead>
+                      <TableHead>Empresa</TableHead>
+                      <TableHead>Assunto</TableHead>
                       <TableHead>Solicitado Por</TableHead>
                       <TableHead>Tipo Documento</TableHead>
-                      <TableHead>Plataforma</TableHead>
                       <TableHead>Assinatura de</TableHead>
                       <TableHead>Data</TableHead>
                       <TableHead>Responsável</TableHead>
-                      <TableHead>Criado em</TableHead>
+                      <TableHead>Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {records.map((record) => {
+                    {displayRecords.map((record) => {
+                      const company = record.company === "OUTRO" ? record.companyOther : record.company;
+                      const subject = record.subject === "OUTRO" ? record.subjectOther : record.subject;
                       const requestedBy = record.requestedBy === "OUTRO" ? record.requestedByOther : record.requestedBy;
                       const signedBy = record.signedBy === "OUTRO" ? record.signedByOther : record.signedBy;
                       const responsible = record.responsible === "OUTRO" ? record.responsibleOther : record.responsible;
-                      const platform = record.documentType === "ONLINE" ? record.onlinePlatform : "N/A";
                       
                       return (
                         <TableRow key={record.id}>
                           <TableCell className="font-medium">{record.id}</TableCell>
+                          <TableCell>{company}</TableCell>
+                          <TableCell>{subject}</TableCell>
                           <TableCell>{requestedBy}</TableCell>
                           <TableCell>{record.documentType}</TableCell>
-                          <TableCell>{platform}</TableCell>
                           <TableCell>{signedBy}</TableCell>
                           <TableCell>{new Date(record.signatureDate).toLocaleDateString('pt-BR')}</TableCell>
                           <TableCell>{responsible}</TableCell>
-                          <TableCell>{new Date(record.createdAt).toLocaleDateString('pt-BR')}</TableCell>
+                          <TableCell>
+                            {showDeleted ? (
+                              <div className="flex gap-2">
+                                <Button 
+                                  size="sm" 
+                                  variant="outline"
+                                  onClick={() => restoreMutation.mutate({ id: record.id })}
+                                  disabled={restoreMutation.isPending}
+                                >
+                                  Restaurar
+                                </Button>
+                                <Button 
+                                  size="sm" 
+                                  variant="destructive"
+                                  onClick={() => {
+                                    if (confirm("Tem certeza que deseja excluir permanentemente?")) {
+                                      permanentDeleteMutation.mutate({ id: record.id });
+                                    }
+                                  }}
+                                  disabled={permanentDeleteMutation.isPending}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            ) : (
+                              <Button 
+                                size="sm" 
+                                variant="destructive"
+                                onClick={() => softDeleteMutation.mutate({ id: record.id })}
+                                disabled={softDeleteMutation.isPending}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            )}
+                          </TableCell>
                         </TableRow>
                       );
                     })}

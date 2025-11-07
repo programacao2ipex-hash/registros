@@ -24,4 +24,27 @@
 - [x] Testar exportação CSV
 - [x] Testar exportação PDF
 - [x] Criar checkpoint para deploy
-- [ ] Configurar repositório GitHub
+- [x] Configurar repositório GitHub
+
+## Novos Campos - Empresa e Assunto
+- [x] Adicionar campo "empresa" ao schema do banco de dados
+- [x] Adicionar campo "assunto" ao schema do banco de dados
+- [x] Atualizar migrations do banco de dados
+- [x] Adicionar campo "Empresa" ao formulário
+- [x] Adicionar campo "Assunto" ao formulário
+- [x] Atualizar rotas tRPC para incluir novos campos
+- [x] Atualizar tabela de listagem com novos campos
+- [x] Atualizar exportação CSV com novos campos
+- [x] Atualizar exportação PDF com novos campos
+- [x] Testar criação de registro com novos campos
+- [x] Criar checkpoint final
+
+## Funcionalidade de Exclusão
+- [x] Adicionar campo "deletedAt" ao schema para soft delete
+- [x] Atualizar migrations do banco de dados com novo campo
+- [x] Implementar rota tRPC para soft delete (mover para excluídos)
+- [x] Implementar rota tRPC para exclusão permanente
+- [x] Criar página de registros excluídos
+- [x] Adicionar botão de exclusão na tabela de registros
+- [x] Adicionar funcionalidade de restaurar registros excluídos
+- [x] Testar soft delete e exclusão permanente

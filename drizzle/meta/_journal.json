@@ -15,6 +15,20 @@
       "when": 1762535029683,
       "tag": "0001_amused_shriek",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1762536554574,
+      "tag": "0002_panoramic_nightcrawler",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1762536613858,
+      "tag": "0003_opposite_puff_adder",
+      "breakpoints": true
     }
   ]
 }

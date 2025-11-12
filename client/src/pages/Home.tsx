@@ -28,6 +28,13 @@ export default function Home() {
     return `${year}-${month}-${day}`;
   };
 
+  const getLocalTimeString = () => {
+    const now = new Date();
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    return `${hours}:${minutes}`;
+  };
+
   const [formData, setFormData] = useState({
     company: "",
     companyOther: "",
@@ -40,6 +47,7 @@ export default function Home() {
     signedBy: [] as string[],
     signedByOther: "",
     signatureDate: getLocalDateString(),
+    signatureTime: getLocalTimeString(),
     responsible: "",
     responsibleOther: "",
   });
@@ -59,6 +67,7 @@ export default function Home() {
         signedBy: [],
         signedByOther: "",
         signatureDate: getLocalDateString(),
+        signatureTime: getLocalTimeString(),
         responsible: "",
         responsibleOther: "",
       });
@@ -133,6 +142,10 @@ export default function Home() {
       toast.error("Selecione a data");
       return;
     }
+    if (!formData.signatureTime) {
+      toast.error("Selecione a hora");
+      return;
+    }
     if (!formData.responsible) {
       toast.error("Selecione o responsável");
       return;
@@ -145,6 +158,19 @@ export default function Home() {
     const requestedByValue = formData.requestedBy.join(", ");
     const signedByValue = formData.signedBy.join(", ");
 
+    // Combine date and time properly
+    const [year, month, day] = formData.signatureDate.split('-');
+    const [hours, minutes] = formData.signatureTime.split(':');
+    const signatureDatetime = new Date(
+      parseInt(year),
+      parseInt(month) - 1,
+      parseInt(day),
+      parseInt(hours),
+      parseInt(minutes),
+      0,
+      0
+    );
+
     createMutation.mutate({
       company: formData.company,
       companyOther: formData.company === "OUTRO" ? formData.companyOther : undefined,
@@ -156,7 +182,7 @@ export default function Home() {
       onlinePlatform: formData.documentType === "ONLINE" ? formData.onlinePlatform : undefined,
       signedBy: signedByValue,
       signedByOther: formData.signedBy.includes("OUTRO") ? formData.signedByOther : undefined,
-      signatureDate: new Date(formData.signatureDate),
+      signatureDate: signatureDatetime,
       responsible: formData.responsible,
       responsibleOther: formData.responsible === "OUTRO" ? formData.responsibleOther : undefined,
     });
@@ -334,7 +360,7 @@ export default function Home() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="signatureDate">Data</Label>
+                <Label htmlFor="signatureDate">Data e Hora</Label>
                 <div className="flex gap-2">
                   <Input
                     id="signatureDate"
@@ -343,12 +369,25 @@ export default function Home() {
                     onChange={(e) => setFormData({ ...formData, signatureDate: e.target.value })}
                     className="flex-1"
                   />
+                  <Input
+                    id="signatureTime"
+                    type="time"
+                    value={formData.signatureTime}
+                    onChange={(e) => setFormData({ ...formData, signatureTime: e.target.value })}
+                    className="flex-1"
+                  />
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => setFormData({ ...formData, signatureDate: getLocalDateString() })}
+                    onClick={() => {
+                      setFormData({ 
+                        ...formData, 
+                        signatureDate: getLocalDateString(),
+                        signatureTime: getLocalTimeString()
+                      });
+                    }}
                   >
-                    Hoje
+                    Agora
                   </Button>
                 </div>
               </div>

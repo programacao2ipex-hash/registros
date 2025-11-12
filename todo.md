@@ -69,3 +69,10 @@
 - [ ] Listar registros criados pelo usuário
 - [ ] Adicionar link para perfil na navegação
 - [ ] Testar página de perfil
+
+
+## Correção de Data e Adição de Hora
+- [ ] Corrigir problema da data que está salvando com um dia anterior
+- [ ] Adicionar campo de hora ao formulário
+- [ ] Atualizar schema do banco de dados para incluir hora
+- [ ] Testar salvamento correto de data e hora

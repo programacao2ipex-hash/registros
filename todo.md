@@ -51,8 +51,21 @@
 
 
 ## Funcionalidade de Envio de Email
-- [ ] Implementar rota tRPC para envio de email
-- [ ] Adicionar botão de envio de email na tabela de registros
-- [ ] Configurar email pré-preenchido (emanuel@ipexconstrutora.com.br)
-- [ ] Testar envio de email
-- [ ] Criar checkpoint final com email
+- [x] Implementar rota tRPC para envio de email
+- [x] Adicionar botão de envio de email na tabela de registros
+- [x] Configurar email pré-preenchido (emanuel@ipexconstrutora.com.br)
+- [x] Testar envio de email
+- [x] Criar checkpoint final com email
+
+## Ajustes Solicitados
+- [x] Corrigir problema da data que está puxando um dia anterior (timezone)
+- [x] Adicionar multiseleção aos campos
+- [x] Testar ajustes de data e multiseleção
+
+## Página de Perfil do Usuário
+- [ ] Implementar rota tRPC para listar registros do usuário
+- [ ] Criar página de perfil do usuário
+- [ ] Exibir dados do usuário (nome, email, data de cadastro)
+- [ ] Listar registros criados pelo usuário
+- [ ] Adicionar link para perfil na navegação
+- [ ] Testar página de perfil

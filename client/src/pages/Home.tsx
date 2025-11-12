@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { APP_LOGO, APP_TITLE, getLoginUrl } from "@/const";
 import { trpc } from "@/lib/trpc";
 import { FileText, Loader2 } from "lucide-react";
@@ -19,18 +20,26 @@ const DOCUMENT_TYPES = ["PDF", "ONLINE"];
 
 export default function Home() {
   const { user, loading, isAuthenticated } = useAuth();
+  const getLocalDateString = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   const [formData, setFormData] = useState({
     company: "",
     companyOther: "",
     subject: "",
     subjectOther: "",
-    requestedBy: "",
+    requestedBy: [] as string[],
     requestedByOther: "",
     documentType: "",
     onlinePlatform: "",
-    signedBy: "",
+    signedBy: [] as string[],
     signedByOther: "",
-    signatureDate: new Date().toISOString().split('T')[0],
+    signatureDate: getLocalDateString(),
     responsible: "",
     responsibleOther: "",
   });
@@ -38,19 +47,18 @@ export default function Home() {
   const createMutation = trpc.documentRecords.create.useMutation({
     onSuccess: () => {
       toast.success("Registro criado com sucesso!");
-      // Reset form
       setFormData({
         company: "",
         companyOther: "",
         subject: "",
         subjectOther: "",
-        requestedBy: "",
+        requestedBy: [],
         requestedByOther: "",
         documentType: "",
         onlinePlatform: "",
-        signedBy: "",
+        signedBy: [],
         signedByOther: "",
-        signatureDate: new Date().toISOString().split('T')[0],
+        signatureDate: getLocalDateString(),
         responsible: "",
         responsibleOther: "",
       });
@@ -60,10 +68,27 @@ export default function Home() {
     },
   });
 
+  const handleRequestedByChange = (option: string) => {
+    setFormData(prev => ({
+      ...prev,
+      requestedBy: prev.requestedBy.includes(option)
+        ? prev.requestedBy.filter(item => item !== option)
+        : [...prev.requestedBy, option]
+    }));
+  };
+
+  const handleSignedByChange = (option: string) => {
+    setFormData(prev => ({
+      ...prev,
+      signedBy: prev.signedBy.includes(option)
+        ? prev.signedBy.filter(item => item !== option)
+        : [...prev.signedBy, option]
+    }));
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validation
     if (!formData.company) {
       toast.error("Selecione a empresa");
       return;
@@ -80,11 +105,11 @@ export default function Home() {
       toast.error("Digite o assunto");
       return;
     }
-    if (!formData.requestedBy) {
-      toast.error("Selecione quem solicitou");
+    if (formData.requestedBy.length === 0) {
+      toast.error("Selecione pelo menos uma pessoa que solicitou");
       return;
     }
-    if (formData.requestedBy === "OUTRO" && !formData.requestedByOther) {
+    if (formData.requestedBy.includes("OUTRO") && !formData.requestedByOther) {
       toast.error("Digite o nome de quem solicitou");
       return;
     }
@@ -96,11 +121,11 @@ export default function Home() {
       toast.error("Digite a plataforma online");
       return;
     }
-    if (!formData.signedBy) {
-      toast.error("Selecione quem assinou");
+    if (formData.signedBy.length === 0) {
+      toast.error("Selecione pelo menos uma pessoa que assinou");
       return;
     }
-    if (formData.signedBy === "OUTRO" && !formData.signedByOther) {
+    if (formData.signedBy.includes("OUTRO") && !formData.signedByOther) {
       toast.error("Digite o nome de quem assinou");
       return;
     }
@@ -117,17 +142,20 @@ export default function Home() {
       return;
     }
 
+    const requestedByValue = formData.requestedBy.join(", ");
+    const signedByValue = formData.signedBy.join(", ");
+
     createMutation.mutate({
       company: formData.company,
       companyOther: formData.company === "OUTRO" ? formData.companyOther : undefined,
       subject: formData.subject,
       subjectOther: formData.subject === "OUTRO" ? formData.subjectOther : undefined,
-      requestedBy: formData.requestedBy,
-      requestedByOther: formData.requestedBy === "OUTRO" ? formData.requestedByOther : undefined,
+      requestedBy: requestedByValue,
+      requestedByOther: formData.requestedBy.includes("OUTRO") ? formData.requestedByOther : undefined,
       documentType: formData.documentType as "PDF" | "ONLINE",
       onlinePlatform: formData.documentType === "ONLINE" ? formData.onlinePlatform : undefined,
-      signedBy: formData.signedBy,
-      signedByOther: formData.signedBy === "OUTRO" ? formData.signedByOther : undefined,
+      signedBy: signedByValue,
+      signedByOther: formData.signedBy.includes("OUTRO") ? formData.signedByOther : undefined,
       signatureDate: new Date(formData.signatureDate),
       responsible: formData.responsible,
       responsibleOther: formData.responsible === "OUTRO" ? formData.responsibleOther : undefined,
@@ -234,19 +262,23 @@ export default function Home() {
                 )}
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="requestedBy">Solicitado por</Label>
-                <Select value={formData.requestedBy} onValueChange={(value) => setFormData({ ...formData, requestedBy: value })}>
-                  <SelectTrigger id="requestedBy">
-                    <SelectValue placeholder="Selecione..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {REQUESTED_BY_OPTIONS.map(option => (
-                      <SelectItem key={option} value={option}>{option}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {formData.requestedBy === "OUTRO" && (
+              <div className="space-y-3">
+                <Label>Solicitado por (múltipla seleção)</Label>
+                <div className="space-y-2 border rounded-lg p-3">
+                  {REQUESTED_BY_OPTIONS.map(option => (
+                    <div key={option} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`requestedBy-${option}`}
+                        checked={formData.requestedBy.includes(option)}
+                        onCheckedChange={() => handleRequestedByChange(option)}
+                      />
+                      <Label htmlFor={`requestedBy-${option}`} className="font-normal cursor-pointer">
+                        {option}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+                {formData.requestedBy.includes("OUTRO") && (
                   <Input
                     placeholder="Digite o nome"
                     value={formData.requestedByOther}
@@ -276,19 +308,23 @@ export default function Home() {
                 )}
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="signedBy">Assinatura de</Label>
-                <Select value={formData.signedBy} onValueChange={(value) => setFormData({ ...formData, signedBy: value })}>
-                  <SelectTrigger id="signedBy">
-                    <SelectValue placeholder="Selecione..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {SIGNED_BY_OPTIONS.map(option => (
-                      <SelectItem key={option} value={option}>{option}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {formData.signedBy === "OUTRO" && (
+              <div className="space-y-3">
+                <Label>Assinatura de (múltipla seleção)</Label>
+                <div className="space-y-2 border rounded-lg p-3">
+                  {SIGNED_BY_OPTIONS.map(option => (
+                    <div key={option} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`signedBy-${option}`}
+                        checked={formData.signedBy.includes(option)}
+                        onCheckedChange={() => handleSignedByChange(option)}
+                      />
+                      <Label htmlFor={`signedBy-${option}`} className="font-normal cursor-pointer">
+                        {option}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+                {formData.signedBy.includes("OUTRO") && (
                   <Input
                     placeholder="Digite o nome"
                     value={formData.signedByOther}
@@ -310,7 +346,7 @@ export default function Home() {
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => setFormData({ ...formData, signatureDate: new Date().toISOString().split('T')[0] })}
+                    onClick={() => setFormData({ ...formData, signatureDate: getLocalDateString() })}
                   >
                     Hoje
                   </Button>
